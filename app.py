@@ -22,7 +22,7 @@ def get_db_connection():
         connection = mysql.connector.connect(**DB_CONFIG)
         return connection
     except Error as e:
-        print(f'Fel vid anslutning till MySQL: {e}')
+        print(f'Error while connecting to MySQL: {e}')
         return None
     
 def is_valid_user_data(data):
@@ -36,6 +36,7 @@ def index():
         <li>GET /users/&lt;id&gt;</li>
         <li>POST /users</li>
         <li>PUT /users/&lt;id&gt;</li>
+        <li>POST /login</li>
     </ul>'''
 
 @app.route('/users', methods=['GET'])
@@ -67,7 +68,7 @@ def get_user(user_id):
 def create_user():
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({'error': 'Json format required'}), 400
+        return jsonify({'error': 'Incorrect Json format'}), 400
 
     username = data.get('username')
     password = data.get('password')
@@ -102,15 +103,15 @@ def create_user():
 def update_user(user_id):
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({'error': 'Json format required'}), 400
+        return jsonify({'error': 'Incorrect Json format'}), 400
 
     username = data.get('username')
     password = data.get('password')
 
     if not username:
-        jsonify({'error': 'username required'}), 400
+        return jsonify({'error': 'username required'}), 400
     if not password:
-        jsonify({'error': 'password required'}), 400
+        return jsonify({'error': 'password required'}), 400
 
     try:
         connection = get_db_connection()
@@ -128,6 +129,9 @@ def update_user(user_id):
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Incorrect Json format'}), 400
+    
     username = data.get('username')
     password = data.get('password')
    
@@ -148,12 +152,12 @@ def login():
 
     return jsonify(access_token=access_token), 200
 
-# @app.route('/protected', methods=['GET'])
-# @jwt_required()
-# def protected():
-#     current_user = get_jwt_identity()
-#     print(get_jwt())
-#     return jsonify(logged_in_as=current_user), 200
+@app.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    current_user = get_jwt_identity()
+    print(get_jwt())
+    return jsonify(logged_in_as=current_user), 200
 
 
 
