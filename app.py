@@ -3,12 +3,14 @@ from flask_cors import CORS
 import mysql.connector
 from mysql.connector import Error, IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import timedelta
 
 app = Flask(__name__)
-app.config['JWT_SECRET_KEY'] = 'SUPER_SECRET_KEY'
-
 jwt = JWTManager(app)
+
+app.config['JWT_SECRET_KEY'] = 'SUPER_SECRET_KEY'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=1)
 
 DB_CONFIG = {
     'host': 'localhost',
@@ -37,17 +39,25 @@ def index():
         <li>POST /users - Skapar en ny användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
         <li>PUT /users/&lt;id&gt; - Uppdaterar en befintlig användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
         <li>POST /login - Loggar in en användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}</li><br>
-        <li>GET /me - visar inloggad användare, kräver autentisering</li><br>
+        <li>GET /protected - visar vem som är inloggad, kräver autentisering</li><br>
+        <li>GET /me - visar information om den inloggade användaren, kräver autentisering</li><br>
     </ul>'''
 
 @app.route('/users', methods=['GET'])
 @jwt_required()
 def get_users():
     connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'database connection failed'}), 500
     cursor = connection.cursor(dictionary=True)
     sql = "SELECT * FROM users"
     cursor.execute(sql)
     users = cursor.fetchall()
+    if cursor:
+        cursor.close()
+    if connection:
+        connection.close()
+
     if not users:
         return jsonify({'error': 'database error'}), 500
     return jsonify(users)
@@ -56,10 +66,17 @@ def get_users():
 @jwt_required()
 def get_user(user_id):
     connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'database connection failed'}), 500
     cursor = connection.cursor(dictionary=True)
     sql = "SELECT * FROM users WHERE id = %s"
     cursor.execute(sql, (user_id,))
     user = cursor.fetchone()
+    if cursor:
+        cursor.close()
+    if connection:
+        connection.close()
+
     if not user:
         return jsonify({'error': 'User not found'}), 404
     return jsonify(user)
@@ -81,6 +98,8 @@ def create_user():
 
     try:
         connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
         cursor = connection.cursor()
         hashed_password = generate_password_hash(password)
         sql = "INSERT INTO users (username, password) VALUES (%s, %s)"
@@ -88,16 +107,21 @@ def create_user():
                 
         connection.commit()
         user_id = cursor.lastrowid
-                
+
         user = {
             'id': user_id,
             'username': username
         }
-        return jsonify({'message': 'user created'}, user), 201
+        return jsonify({'message': 'user created', 'user': user}), 201
     except IntegrityError:
         return jsonify({'error': 'username already exists'}), 400
     except Error:
         return jsonify({'error': 'something went wrong'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
     
 @app.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -116,6 +140,8 @@ def update_user(user_id):
 
     try:
         connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
         cursor = connection.cursor()
         hashed_password = generate_password_hash(password)
         sql = """UPDATE users SET username = %s, password = %s WHERE id = %s"""
@@ -126,45 +152,78 @@ def update_user(user_id):
         return jsonify({'error': 'username already exists'}), 400
     except Error:
         return jsonify({'error': 'something went wrong'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({'error': 'Incorrect Json format'}), 400
     
     username = data.get('username')
     password = data.get('password')
    
-    connection = get_db_connection()
-       
-    cursor = connection.cursor(dictionary=True)
-    sql = "SELECT * FROM users WHERE username = %s"
-    cursor.execute(sql, (username,))
-    user = cursor.fetchone()
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
+        
+        cursor = connection.cursor(dictionary=True)
+        sql = "SELECT * FROM users WHERE username = %s"
+        cursor.execute(sql, (username,))
+        user = cursor.fetchone()
 
-    if not user or not check_password_hash(user['password'], password):
-        return jsonify({'error': 'Invalid username or password'}), 401
+        if not user or not check_password_hash(user['password'], password):
+            return jsonify({'error': 'Invalid username or password'}), 401
     
-    if 'password' in user:
-        del user['password']
+        if 'password' in user:
+            del user['password']
 
-    access_token = create_access_token(identity=username)
+        access_token = create_access_token(identity=username)
 
-    return jsonify({
-        "message": "Login successful",
-        "access_token": access_token,
-        "user": user
-    }), 200
+        return jsonify({"access_token": access_token,}), 200
+    except Error:
+        return jsonify({'error': 'database error'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+
+@app.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    current_user = get_jwt_identity()
+    return jsonify({'Logged in as': current_user}), 200
 
 @app.route('/me', methods=['GET'])
 @jwt_required()
 def me():
     current_user = get_jwt_identity()
-    print(get_jwt())
-    return jsonify({'Logged in as': current_user}), 200
-
-
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
+        sql = "SELECT id, username FROM users WHERE username = %s"
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(sql, (current_user,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(user), 200
+    except Error:
+        return jsonify({'error': 'database error'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
