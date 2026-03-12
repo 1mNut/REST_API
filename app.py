@@ -37,6 +37,7 @@ def index():
         <li>POST /users</li>
         <li>PUT /users/&lt;id&gt;</li>
         <li>POST /login</li>
+        <li>GET /protected</li>
     </ul>'''
 
 @app.route('/users', methods=['GET'])
