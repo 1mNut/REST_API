@@ -32,12 +32,12 @@ def is_valid_user_data(data):
 def index():
     return '''<h1>Documentation</h1>
     <ul>
-        <li>GET /users</li>
-        <li>GET /users/&lt;id&gt;</li>
-        <li>POST /users</li>
-        <li>PUT /users/&lt;id&gt;</li>
-        <li>POST /login</li>
-        <li>GET /protected</li>
+        <li>GET /users - Hämtar alla användare, kräver autentisering</li><br>
+        <li>GET /users/&lt;id&gt; - Hämtar en specifik användare utifrån id, kräver autentisering</li><br>
+        <li>POST /users - Skapar en ny användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
+        <li>PUT /users/&lt;id&gt; - Uppdaterar en befintlig användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
+        <li>POST /login - Loggar in en användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}</li><br>
+        <li>GET /me - visar inloggad användare, kräver autentisering</li><br>
     </ul>'''
 
 @app.route('/users', methods=['GET'])
@@ -144,21 +144,25 @@ def login():
     user = cursor.fetchone()
 
     if not user or not check_password_hash(user['password'], password):
-        return jsonify({'error': 'Invalid email or password'}), 401
+        return jsonify({'error': 'Invalid username or password'}), 401
     
     if 'password' in user:
         del user['password']
 
     access_token = create_access_token(identity=username)
 
-    return jsonify(access_token=access_token), 200
+    return jsonify({
+        "message": "Login successful",
+        "access_token": access_token,
+        "user": user
+    }), 200
 
-@app.route('/protected', methods=['GET'])
+@app.route('/me', methods=['GET'])
 @jwt_required()
-def protected():
+def me():
     current_user = get_jwt_identity()
     print(get_jwt())
-    return jsonify(logged_in_as=current_user), 200
+    return jsonify({'Logged in as': current_user}), 200
 
 
 
