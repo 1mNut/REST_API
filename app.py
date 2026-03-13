@@ -33,13 +33,13 @@ def is_valid_user_data(data):
 def index():
     return '''<h1>Documentation</h1>
     <ul>
-        <li>GET /users - Hämtar alla användare, kräver autentisering</li><br>
-        <li>GET /users/&lt;id&gt; - Hämtar en specifik användare utifrån id, kräver autentisering</li><br>
-        <li>POST /users - Skapar en ny användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
-        <li>PUT /users/&lt;id&gt; - Uppdaterar en befintlig användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver autentisering</li><br>
+        <li>GET /users - Hämtar alla användare, kräver token</li><br>
+        <li>GET /users/&lt;id&gt; - Hämtar en specifik användare utifrån id, kräver token</li><br>
+        <li>POST /users - Skapar en ny användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver token</li><br>
+        <li>PUT /users/&lt;id&gt; - Uppdaterar en befintlig användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}, kräver token</li><br>
         <li>POST /login - Loggar in en användare som ska se ut som följande: {"username": "användarnamn", "password": "lösenord"}</li><br>
-        <li>GET /protected - visar vem som är inloggad, kräver autentisering</li><br>
-        <li>GET /me - visar information om den inloggade användaren, kräver autentisering</li><br>
+        <li>GET /protected - visar vem som är inloggad, kräver token</li><br>
+        <li>GET /me - visar information om den inloggade användaren, kräver token</li><br>
     </ul>'''
 
 @app.route('/users', methods=['GET'])
