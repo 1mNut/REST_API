@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 import mysql.connector
 from mysql.connector import Error, IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -46,44 +45,67 @@ def index():
 @app.route('/users', methods=['GET'])
 @jwt_required()
 def get_users():
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'database connection failed'}), 500
-    cursor = connection.cursor(dictionary=True)
-    sql = "SELECT * FROM users"
-    cursor.execute(sql)
-    users = cursor.fetchall()
-    if cursor:
-        cursor.close()
-    if connection:
-        connection.close()
 
-    if not users:
-        return jsonify({'error': 'database error'}), 500
-    return jsonify(users)
+    cursor = None
+    connection = None
+
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
+        cursor = connection.cursor(dictionary=True)
+        sql = "SELECT * FROM users"
+        cursor.execute(sql)
+        users = cursor.fetchall()
+        if not users:
+            return jsonify({'error': 'database error'}), 500
+        return jsonify(users)
+    except Error:
+        return jsonify({'error': 'something went wrong'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+
 
 @app.route('/users/<int:user_id>', methods=['GET'])
 @jwt_required()
 def get_user(user_id):
-    connection = get_db_connection()
-    if not connection:
-        return jsonify({'error': 'database connection failed'}), 500
-    cursor = connection.cursor(dictionary=True)
-    sql = "SELECT * FROM users WHERE id = %s"
-    cursor.execute(sql, (user_id,))
-    user = cursor.fetchone()
-    if cursor:
-        cursor.close()
-    if connection:
-        connection.close()
 
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    return jsonify(user)
+    cursor = None
+    connection = None
+
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'error': 'database connection failed'}), 500
+        cursor = connection.cursor(dictionary=True)
+        sql = "SELECT * FROM users WHERE id = %s"
+        cursor.execute(sql, (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(user)
+    except Error:
+        return jsonify({'error': 'something went wrong'}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
 
 @app.route('/users', methods=['POST'])
 @jwt_required()
 def create_user():
+
+    cursor = None
+    connection = None
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({'error': 'Incorrect Json format'}), 400
@@ -126,6 +148,10 @@ def create_user():
 @app.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def update_user(user_id):
+
+    cursor = None
+    connection = None
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({'error': 'Incorrect Json format'}), 400
@@ -160,6 +186,10 @@ def update_user(user_id):
 
 @app.route('/login', methods=['POST'])
 def login():
+
+    cursor = None
+    connection = None
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({'error': 'Incorrect Json format'}), 400
@@ -205,6 +235,10 @@ def protected():
 @app.route('/me', methods=['GET'])
 @jwt_required()
 def me():
+
+    cursor = None
+    connection = None
+
     current_user = get_jwt_identity()
     try:
         connection = get_db_connection()
